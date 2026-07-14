@@ -1,4 +1,4 @@
-name: Build AIC8800 PCIe DKMS Debian Package
+name: Build AIC8800 DKMS Debian Package
 
 on:
   workflow_dispatch:
@@ -11,7 +11,8 @@ jobs:
       image: ubuntu:26.04
 
     steps:
-      - name: Install build tools
+
+      - name: Install dependencies
         run: |
           apt update
           apt install -y \
@@ -20,15 +21,15 @@ jobs:
             devscripts \
             debhelper \
             dh-exec \
-            dos2unix \
+            dh-dkms \
+            dkms \
             fakeroot \
             quilt \
-            dkms \
-            dh-dkms \
+            dos2unix \
             gcc-aarch64-linux-gnu \
             ca-certificates
 
-      - name: Clone AIC8800 source
+      - name: Download AIC8800 source
         run: |
           git clone https://github.com/radxa-pkg/aic8800.git aic8800
 
@@ -36,20 +37,31 @@ jobs:
         run: |
           cd aic8800
 
-          # 修复 Windows 换行
+          # 修复源码换行
           find . \
             \( -name "*.c" -o -name "*.h" -o -name "*.patch" \) \
             -exec dos2unix {} \;
 
-          # PCIe 不需要 USB patch
-          sed -i '/fix-usb/d' debian/patches/series
+          # 删除USB相关patch，避免版本冲突
+          sed -i '/fix-usb/d' debian/patches/series || true
 
-          # 跳过跨架构测试程序处理
-          printf '\noverride_dh_dwz:\n' >> debian/rules
+          # 跳过ARM64测试程序导致的打包检查失败
+          printf '\n' >> debian/rules
+
+          printf 'override_dh_dwz:\n' >> debian/rules
           printf '\t@echo "Skip dh_dwz"\n' >> debian/rules
 
-          printf '\noverride_dh_strip:\n' >> debian/rules
+          printf '\n' >> debian/rules
+
+          printf 'override_dh_strip:\n' >> debian/rules
           printf '\t@echo "Skip dh_strip"\n' >> debian/rules
+
+          printf '\n' >> debian/rules
+
+          printf 'override_dh_shlibdeps:\n' >> debian/rules
+          printf '\t@echo "Skip dh_shlibdeps"\n' >> debian/rules
+
+          chmod +x debian/rules
 
       - name: Build Debian package
         run: |
@@ -65,12 +77,14 @@ jobs:
         run: |
           mkdir output
 
-          find .. -name "*.deb" -exec cp {} output/ \;
+          find .. \
+            -name "*.deb" \
+            -exec cp {} output/ \;
 
           ls -lh output
 
-      - name: Upload packages
+      - name: Upload package
         uses: actions/upload-artifact@v4
         with:
-          name: aic8800-pcie-dkms
+          name: aic8800-dkms
           path: output/*.deb
