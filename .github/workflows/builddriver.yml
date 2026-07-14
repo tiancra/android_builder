@@ -1,4 +1,4 @@
-name: Build AIC8800 PCIe Debian Package
+name: Build AIC8800 DKMS Debian Package
 
 on:
   workflow_dispatch:
@@ -11,7 +11,7 @@ jobs:
       image: ubuntu:26.04
 
     steps:
-      - name: Install build dependencies
+      - name: Install build tools
         run: |
           apt update
           apt install -y \
@@ -19,51 +19,53 @@ jobs:
             build-essential \
             devscripts \
             debhelper \
+            dh-exec \
+            dos2unix \
             fakeroot \
             quilt \
-            dh-dkms \
             dkms \
+            dh-dkms \
             ca-certificates
 
-      - name: Clone AIC8800 package source
+      - name: Clone AIC8800 source
         run: |
           git clone https://github.com/radxa-pkg/aic8800.git aic8800
 
-      - name: Fix source and patches
+      - name: Prepare source
         run: |
           cd aic8800
 
-          # 修复 Windows 换行导致的 patch 失败
-          find . -type f \
+          # 修复换行符问题
+          find . \
             \( -name "*.c" -o -name "*.h" -o -name "*.patch" \) \
-            -exec sed -i 's/\r$//' {} \;
+            -exec dos2unix {} \;
 
-          # PCIe 网卡不需要 USB 补丁
+          # TL-XDN6180 是 PCIe，移除 USB 相关补丁
           sed -i '/fix-usb/d' debian/patches/series
 
-          echo "Current patches:"
+          echo "Patch list:"
           cat debian/patches/series
 
-      - name: Build deb package
+      - name: Build Debian package
         run: |
           cd aic8800
 
           dpkg-buildpackage \
             -us \
             -uc \
-            -b
+            -b \
+            -d
 
-      - name: Collect deb files
+      - name: Collect packages
         run: |
           mkdir output
 
-          cp *.deb output/ || true
           cp ../*.deb output/ || true
 
           ls -lh output
 
-      - name: Upload package
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: aic8800-pcie-deb
+          name: aic8800-dkms-package
           path: output/*.deb
