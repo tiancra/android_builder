@@ -1,4 +1,4 @@
-name: Build AIC8800 kernel module deb
+name: Build AIC8800 DKMS Ubuntu 26.04
 
 on:
   workflow_dispatch:
@@ -11,48 +11,39 @@ jobs:
       image: ubuntu:26.04
 
     steps:
-      - name: Install tools
+      - name: Install build tools
         run: |
           apt update
           apt install -y \
             git \
             build-essential \
-            fakeroot \
+            dkms \
             debhelper \
-            linux-headers-7.0.0-14-generic
+            fakeroot \
+            ca-certificates
 
-      - name: Get driver
+      - name: Clone AIC8800 source
         run: |
-          git clone https://github.com/Kiborgik/aic8800dc-linux-patched.git driver
+          git clone https://github.com/radxa-pkg/aic8800.git aic8800
 
-      - name: Build
-        working-directory: driver
+      - name: Check source
         run: |
-          make
+          find aic8800 -name dkms.conf
+          find aic8800 -name Makefile
 
-      - name: Package
+      - name: Build package
         run: |
-          mkdir -p pkg/lib/modules/7.0.0-14-generic/kernel/drivers/net/wireless/aic8800
+          cd aic8800
+          dpkg-buildpackage -us -uc -b
 
-          find driver -name "*.ko" \
-          -exec cp {} pkg/lib/modules/7.0.0-14-generic/kernel/drivers/net/wireless/aic8800/ \;
-
-          depmod -b pkg 7.0.0-14-generic
-
-          mkdir DEBIAN
-
-          cat > DEBIAN/control <<EOF
-          Package: aic8800-prebuilt
-          Version: 1.0
-          Architecture: amd64
-          Maintainer: local
-          Description: AIC8800D80 PCIe driver
-          EOF
-
-          dpkg-deb --build pkg aic8800-prebuilt.deb
+      - name: Collect deb
+        run: |
+          mkdir output
+          cp *.deb output/ || true
+          ls -lh output
 
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: aic8800-deb
-          path: aic8800-prebuilt.deb
+          name: aic8800-ubuntu2604-dkms
+          path: output/*.deb
