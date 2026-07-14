@@ -11,7 +11,7 @@ jobs:
       image: ubuntu:26.04
 
     steps:
-      - name: Install tools
+      - name: Install build tools
         run: |
           apt update
           apt install -y \
@@ -28,14 +28,15 @@ jobs:
             gcc-aarch64-linux-gnu \
             ca-certificates
 
-      - name: Clone source
+      - name: Clone AIC8800 source
         run: |
           git clone https://github.com/radxa-pkg/aic8800.git aic8800
 
-      - name: Prepare
+      - name: Prepare source
         run: |
           cd aic8800
 
+          # 修复换行
           find . \
             \( -name "*.c" -o -name "*.h" -o -name "*.patch" \) \
             -exec dos2unix {} \;
@@ -43,15 +44,11 @@ jobs:
           # PCIe 不需要 USB patch
           sed -i '/fix-usb/d' debian/patches/series
 
-          # 禁止 dh_dwz 处理跨架构测试程序
-          cat >> debian/rules <<'EOF'
+          # 跳过 dh_dwz，避免 ARM64 测试程序导致 objcopy 失败
+          printf '\noverride_dh_dwz:\n' >> debian/rules
+          printf '\t@echo "Skip dh_dwz"\n' >> debian/rules
 
-override_dh_dwz:
-	@echo "Skip dh_dwz"
-
-EOF
-
-      - name: Build
+      - name: Build Debian package
         run: |
           cd aic8800
 
@@ -61,14 +58,16 @@ EOF
             -b \
             -d
 
-      - name: Collect
+      - name: Collect packages
         run: |
           mkdir output
+
           find .. -name "*.deb" -exec cp {} output/ \;
+
           ls -lh output
 
-      - name: Upload
+      - name: Upload packages
         uses: actions/upload-artifact@v4
         with:
-          name: aic8800-dkms
+          name: aic8800-pcie-dkms
           path: output/*.deb
