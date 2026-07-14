@@ -1,4 +1,4 @@
-name: Build AIC8800 DKMS Ubuntu 26.04
+name: Build AIC8800 PCIe Debian Package
 
 on:
   workflow_dispatch:
@@ -11,39 +11,59 @@ jobs:
       image: ubuntu:26.04
 
     steps:
-      - name: Install build tools
+      - name: Install build dependencies
         run: |
           apt update
           apt install -y \
             git \
             build-essential \
-            dkms \
+            devscripts \
             debhelper \
             fakeroot \
+            quilt \
+            dh-dkms \
+            dkms \
             ca-certificates
 
-      - name: Clone AIC8800 source
+      - name: Clone AIC8800 package source
         run: |
           git clone https://github.com/radxa-pkg/aic8800.git aic8800
 
-      - name: Check source
-        run: |
-          find aic8800 -name dkms.conf
-          find aic8800 -name Makefile
-
-      - name: Build package
+      - name: Fix source and patches
         run: |
           cd aic8800
-          dpkg-buildpackage -us -uc -b
 
-      - name: Collect deb
+          # 修复 Windows 换行导致的 patch 失败
+          find . -type f \
+            \( -name "*.c" -o -name "*.h" -o -name "*.patch" \) \
+            -exec sed -i 's/\r$//' {} \;
+
+          # PCIe 网卡不需要 USB 补丁
+          sed -i '/fix-usb/d' debian/patches/series
+
+          echo "Current patches:"
+          cat debian/patches/series
+
+      - name: Build deb package
+        run: |
+          cd aic8800
+
+          dpkg-buildpackage \
+            -us \
+            -uc \
+            -b
+
+      - name: Collect deb files
         run: |
           mkdir output
+
           cp *.deb output/ || true
+          cp ../*.deb output/ || true
+
           ls -lh output
 
-      - name: Upload
+      - name: Upload package
         uses: actions/upload-artifact@v4
         with:
-          name: aic8800-ubuntu2604-dkms
+          name: aic8800-pcie-deb
           path: output/*.deb
