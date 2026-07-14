@@ -36,7 +36,6 @@ jobs:
         run: |
           cd aic8800
 
-          # 修复换行
           find . \
             \( -name "*.c" -o -name "*.h" -o -name "*.patch" \) \
             -exec dos2unix {} \;
@@ -44,11 +43,28 @@ jobs:
           # PCIe 不需要 USB patch
           sed -i '/fix-usb/d' debian/patches/series
 
-      - name: Build package
+          # 删除测试程序安装规则，不删除源码
+          rm -f debian/aicrf-test.install
+
+          # 删除测试包定义
+          sed -i '/aicrf-test/d' debian/control
+
+          # 创建 override 禁止安装测试工具
+          cat >> debian/rules <<'EOF'
+
+override_dh_auto_build:
+	dh_auto_build
+	rm -f src/tools/aicrf_test/wifi_test
+	rm -f src/tools/aicrf_test/bt_test
+
+override_dh_dwz:
+	# skip dwz for cross compiled binaries
+
+EOF
+
+      - name: Build deb
         run: |
           cd aic8800
-
-          export DEB_BUILD_OPTIONS="noddebs"
 
           dpkg-buildpackage \
             -us \
@@ -56,7 +72,7 @@ jobs:
             -b \
             -d
 
-      - name: Remove test package after build
+      - name: Collect
         run: |
           mkdir output
 
