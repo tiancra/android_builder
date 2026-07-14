@@ -11,7 +11,7 @@ jobs:
       image: ubuntu:26.04
 
     steps:
-      - name: Install build tools
+      - name: Install tools
         run: |
           apt update
           apt install -y \
@@ -32,7 +32,7 @@ jobs:
         run: |
           git clone https://github.com/radxa-pkg/aic8800.git aic8800
 
-      - name: Prepare source
+      - name: Prepare
         run: |
           cd aic8800
 
@@ -40,17 +40,25 @@ jobs:
             \( -name "*.c" -o -name "*.h" -o -name "*.patch" \) \
             -exec dos2unix {} \;
 
+          # PCIe 不需要 USB
           sed -i '/fix-usb/d' debian/patches/series
 
-          # 禁止安装 aicrf-test
-          mkdir -p debian/aicrf-test
+          # 删除测试工具
+          rm -rf src/tools/aicrf_test
+          rm -rf debian/aicrf-test
 
-          cat > debian/aicrf-test.install <<EOF
-          EOF
+          # 禁用 dh_dwz
+          mkdir -p debian/source
+          echo "export DEB_BUILD_OPTIONS=nocheck" > /dev/null
 
-      - name: Build package
+          cat > debian/rules.override <<EOF
+EOF
+
+      - name: Build
         run: |
           cd aic8800
+
+          export DEB_BUILD_OPTIONS="noddebs"
 
           dpkg-buildpackage \
             -us \
@@ -58,14 +66,16 @@ jobs:
             -b \
             -d
 
-      - name: Collect
+      - name: Find packages
         run: |
           mkdir output
-          cp ../*.deb output/
+
+          find . -maxdepth 2 -name "*.deb" -exec cp {} output/ \;
+
           ls -lh output
 
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: aic8800-dkms
+          name: aic8800-dkms-package
           path: output/*.deb
