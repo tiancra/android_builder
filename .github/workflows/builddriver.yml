@@ -52,7 +52,6 @@ jobs:
           echo "export DEB_BUILD_OPTIONS=nocheck" > /dev/null
 
           cat > debian/rules.override <<EOF
-EOF
 
       - name: Build
         run: |
