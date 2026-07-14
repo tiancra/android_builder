@@ -25,9 +25,10 @@ jobs:
             quilt \
             dkms \
             dh-dkms \
+            gcc-aarch64-linux-gnu \
             ca-certificates
 
-      - name: Clone AIC8800 source
+      - name: Clone source
         run: |
           git clone https://github.com/radxa-pkg/aic8800.git aic8800
 
@@ -39,21 +40,13 @@ jobs:
             \( -name "*.c" -o -name "*.h" -o -name "*.patch" \) \
             -exec dos2unix {} \;
 
-          # PCIe卡不需要USB相关patch
           sed -i '/fix-usb/d' debian/patches/series
 
-          # 禁止编译ARM测试工具
-          sed -i '/build-aicrf-test/d' .github/local/Makefile.local || true
+          # 禁止安装 aicrf-test
+          mkdir -p debian/aicrf-test
 
-          # 禁止aicrf_test目录进入构建
-          sed -i '/aicrf_test/d' Makefile || true
-
-          echo "Patch list:"
-          cat debian/patches/series
-
-      - name: Install packaging dependencies
-        run: |
-          apt install -y gcc-aarch64-linux-gnu || true
+          cat > debian/aicrf-test.install <<EOF
+          EOF
 
       - name: Build package
         run: |
@@ -65,14 +58,14 @@ jobs:
             -b \
             -d
 
-      - name: Collect packages
+      - name: Collect
         run: |
           mkdir output
-          cp ../*.deb output/ || true
+          cp ../*.deb output/
           ls -lh output
 
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: aic8800-dkms-package
+          name: aic8800-dkms
           path: output/*.deb
