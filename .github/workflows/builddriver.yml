@@ -32,28 +32,19 @@ jobs:
         run: |
           git clone https://github.com/radxa-pkg/aic8800.git aic8800
 
-      - name: Prepare
+      - name: Prepare source
         run: |
           cd aic8800
 
+          # 修复换行
           find . \
             \( -name "*.c" -o -name "*.h" -o -name "*.patch" \) \
             -exec dos2unix {} \;
 
-          # PCIe 不需要 USB
+          # PCIe 不需要 USB patch
           sed -i '/fix-usb/d' debian/patches/series
 
-          # 删除测试工具
-          rm -rf src/tools/aicrf_test
-          rm -rf debian/aicrf-test
-
-          # 禁用 dh_dwz
-          mkdir -p debian/source
-          echo "export DEB_BUILD_OPTIONS=nocheck" > /dev/null
-
-          cat > debian/rules.override <<EOF
-
-      - name: Build
+      - name: Build package
         run: |
           cd aic8800
 
@@ -65,16 +56,16 @@ jobs:
             -b \
             -d
 
-      - name: Find packages
+      - name: Remove test package after build
         run: |
           mkdir output
 
-          find . -maxdepth 2 -name "*.deb" -exec cp {} output/ \;
+          find . -name "*.deb" -exec cp {} output/ \;
 
           ls -lh output
 
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: aic8800-dkms-package
+          name: aic8800-pcie-dkms
           path: output/*.deb
