@@ -1,4 +1,4 @@
-name: Build AIC8800 DKMS Debian Package
+name: Build AIC8800 PCIe DKMS Debian Package
 
 on:
   workflow_dispatch:
@@ -35,18 +35,27 @@ jobs:
         run: |
           cd aic8800
 
-          # 修复换行符问题
           find . \
             \( -name "*.c" -o -name "*.h" -o -name "*.patch" \) \
             -exec dos2unix {} \;
 
-          # TL-XDN6180 是 PCIe，移除 USB 相关补丁
+          # PCIe卡不需要USB相关patch
           sed -i '/fix-usb/d' debian/patches/series
+
+          # 禁止编译ARM测试工具
+          sed -i '/build-aicrf-test/d' .github/local/Makefile.local || true
+
+          # 禁止aicrf_test目录进入构建
+          sed -i '/aicrf_test/d' Makefile || true
 
           echo "Patch list:"
           cat debian/patches/series
 
-      - name: Build Debian package
+      - name: Install packaging dependencies
+        run: |
+          apt install -y gcc-aarch64-linux-gnu || true
+
+      - name: Build package
         run: |
           cd aic8800
 
@@ -59,12 +68,10 @@ jobs:
       - name: Collect packages
         run: |
           mkdir output
-
           cp ../*.deb output/ || true
-
           ls -lh output
 
-      - name: Upload artifact
+      - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: aic8800-dkms-package
