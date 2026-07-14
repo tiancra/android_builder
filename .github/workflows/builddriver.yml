@@ -1,0 +1,58 @@
+name: Build AIC8800 kernel module deb
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+
+    container:
+      image: ubuntu:26.04
+
+    steps:
+      - name: Install tools
+        run: |
+          apt update
+          apt install -y \
+            git \
+            build-essential \
+            fakeroot \
+            debhelper \
+            linux-headers-7.0.0-14-generic
+
+      - name: Get driver
+        run: |
+          git clone https://github.com/Kiborgik/aic8800dc-linux-patched.git driver
+
+      - name: Build
+        working-directory: driver
+        run: |
+          make
+
+      - name: Package
+        run: |
+          mkdir -p pkg/lib/modules/7.0.0-14-generic/kernel/drivers/net/wireless/aic8800
+
+          find driver -name "*.ko" \
+          -exec cp {} pkg/lib/modules/7.0.0-14-generic/kernel/drivers/net/wireless/aic8800/ \;
+
+          depmod -b pkg 7.0.0-14-generic
+
+          mkdir DEBIAN
+
+          cat > DEBIAN/control <<EOF
+          Package: aic8800-prebuilt
+          Version: 1.0
+          Architecture: amd64
+          Maintainer: local
+          Description: AIC8800D80 PCIe driver
+          EOF
+
+          dpkg-deb --build pkg aic8800-prebuilt.deb
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: aic8800-deb
+          path: aic8800-prebuilt.deb
