@@ -36,7 +36,7 @@ jobs:
         run: |
           cd aic8800
 
-          # 修复换行
+          # 修复 Windows 换行
           find . \
             \( -name "*.c" -o -name "*.h" -o -name "*.patch" \) \
             -exec dos2unix {} \;
@@ -44,9 +44,12 @@ jobs:
           # PCIe 不需要 USB patch
           sed -i '/fix-usb/d' debian/patches/series
 
-          # 跳过 dh_dwz，避免 ARM64 测试程序导致 objcopy 失败
+          # 跳过跨架构测试程序处理
           printf '\noverride_dh_dwz:\n' >> debian/rules
           printf '\t@echo "Skip dh_dwz"\n' >> debian/rules
+
+          printf '\noverride_dh_strip:\n' >> debian/rules
+          printf '\t@echo "Skip dh_strip"\n' >> debian/rules
 
       - name: Build Debian package
         run: |
@@ -67,7 +70,7 @@ jobs:
           ls -lh output
 
       - name: Upload packages
-        uses: actions/upload-artifact@v4
+        uses: upload-artifact@v4
         with:
           name: aic8800-pcie-dkms
           path: output/*.deb
